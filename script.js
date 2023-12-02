@@ -3,10 +3,17 @@ const ctx = canvas.getContext("2d");
 canvas.width = 800;
 canvas.height = 500;
 
-const keys = [];
-const charancters = [];
+ctx.font = "20px Arial"; // Set font size and family
+ctx.fillStyle = "black"; // Set text color
+ctx.textAlign = "center"; // Set text alignment
 
-let num_enemies = 20;
+let score = 0;
+let game_over = false;
+
+const keys = [];
+const characters = [];
+
+let num_enemies = 3;
 const enemy_sprites = [
     "starwarssprites/darthvader.png",
     "starwarssprites/darthsidious.png",
@@ -19,11 +26,14 @@ const enemy_sprites = [
     "starwarssprites/stormtrooper.png",
 ];
 
-let num_civilians = 1;
+let num_civilians = 3;
 const civilian_sprites = [
     "starwarssprites/padme.png",
     "starwarssprites/protocoldroid1.png",
     "starwarssprites/rebelpilot.png",
+    "starwarssprites/twilek.png",
+    "starwarssprites/yoda.png",
+    "starwarssprites/oola.png",
 ];
 
 const player = {
@@ -78,14 +88,11 @@ class Enemy extends Character {
 
     update() {
         this.x -= this.speed;
-        if (this.x < 0) {
-            this.x = canvas.width;
-            this.y = Math.random() * (canvas.height - this.height - 40) + 40;
-        }
+        if (this.x < 0) game_over = true;
     }
 }
 for (i = 0; i < num_enemies; i++) {
-    charancters.push(new Enemy());
+    characters.push(new Enemy());
 }
 
 class Civilian extends Character {
@@ -101,13 +108,13 @@ class Civilian extends Character {
     update() {
         this.y -= this.speed;
         if (this.y < 70) {
-            this.y = canvas.height;
-            this.x = Math.random() * 50;
+            this.delete = true;
+            characters.push(new Civilian());
         }
     }
 }
 for (i = 0; i < num_civilians; i++) {
-    charancters.push(new Civilian());
+    characters.push(new Civilian());
 }
 
 const player_sprite = new Image();
@@ -121,6 +128,18 @@ function drawSprite(img, sx, sy, sw, sh, dx, dy, dw, dh) {
 
 window.addEventListener("keydown", function (e) {
     keys[e.key] = true;
+    if (e.code === "Space" && game_over) {
+        game_over = false; // Reset game over flag
+        score = 0; // Reset score or any other game variables
+        characters.splice(0, characters.length);
+        for (i = 0; i < num_enemies; i++) {
+            characters.push(new Enemy());
+        }
+        for (i = 0; i < num_civilians; i++) {
+            characters.push(new Civilian());
+        }
+        startAnimating(24); // Restart the animation
+    }
 });
 window.addEventListener("keyup", function (e) {
     delete keys[e.key];
@@ -128,25 +147,25 @@ window.addEventListener("keyup", function (e) {
 });
 
 function movePlayer() {
-    if (keys["s"]) {
+    if (keys["ArrowDown"] || keys["s"]) {
         player.y += player.speed;
         if (player.y > canvas.height - player.height) player.y = canvas.height - player.height;
         player.frame_y = 0;
         player.moving = true;
     }
-    if (keys["a"]) {
+    if (keys["ArrowLeft"] || keys["a"]) {
         player.x -= player.speed;
         if (player.x < 0) player.x = 0;
         player.frame_y = 1;
         player.moving = true;
     }
-    if (keys["d"]) {
+    if (keys["ArrowRight"] || keys["d"]) {
         player.x += player.speed;
         if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
         player.frame_y = 2;
         player.moving = true;
     }
-    if (keys["w"]) {
+    if (keys["ArrowUp"] || keys["w"]) {
         player.y -= player.speed;
         if (player.y < 40) player.y = 40;
         player.frame_y = 3;
@@ -179,7 +198,12 @@ function startAnimating(fps) {
     animate();
 }
 
+startAnimating(24);
 function animate() {
+    if (game_over) {
+        overlay();
+        return;
+    }
     requestAnimationFrame(animate);
     now = Date.now();
     elapsed = now - then;
@@ -201,14 +225,32 @@ function animate() {
         movePlayer();
         animateSprite(player);
         const to_delete = [];
-        for (i = 0; i < charancters.length; i++) {
-            charancters[i].draw();
-            charancters[i].update();
-            if (rectCollision(player, charancters[i])) {
-                if (charancters[i].frame_y == 1) to_delete.push(i);
-            }
+        for (i = 0; i < characters.length; i++) {
+            characters[i].draw();
+            characters[i].update();
+            if (rectCollision(player, characters[i]) && characters[i].frame_y == 1) {
+                to_delete.push(i);
+                score += 10;
+            } else if (characters[i].delete) to_delete.push(i);
         }
-        for (j = to_delete.length - 1; j >= 0; j--) charancters.splice(to_delete[j], 1);
+        for (j = to_delete.length - 1; j >= 0; j--) characters.splice(to_delete[j], 1);
+        ctx.fillText("Score: " + score, canvas.width - 100, 30);
     }
 }
-startAnimating(24);
+
+overlay();
+function overlay() {
+    ctx.fillStyle = "#d79c50";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000000";
+    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 30);
+    ctx.fillText("Score: " + score, canvas.width / 2, canvas.height / 2);
+    ctx.fillText("Press SPACE to restart", canvas.width / 2, canvas.height / 2 + 30);
+}
+
+window.setInterval(function () {
+    let hundred = Math.floor(score / 100);
+    for (i = 0; i < hundred + 1; i++) {
+        characters.push(new Enemy());
+    }
+}, 1000);
